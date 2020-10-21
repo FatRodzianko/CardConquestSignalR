@@ -8,7 +8,7 @@ namespace CardConquestSignalR.Shared
     public class Rooms
     {
         public string RoomName { get; set; }
-        public ICollection<Player> Players { get; set; }
+        public List<Player> Players { get; set; }
 
         public Rooms(string roomname, List<Player> players)
         {

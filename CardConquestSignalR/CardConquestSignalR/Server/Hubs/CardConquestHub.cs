@@ -12,15 +12,15 @@ namespace CardConquestSignalR.Server.Hubs
     public class CardConquestHub : Hub
     {
         // The cards
-        public Card power5 = new Card("Power 5", 5, 2, 0, @" ---------- 
+        public Card power5 = new Card("Power 5", 5, 2, 2, @" ---------- 
 | POWER: 5 |
 | ATT:   2 |
-| DEF:   0 |
+| DEF:   2 |
  ---------- 
 ");
-        public Card power4 = new Card("Power 4", 4, 1, 1, @" ---------- 
+        public Card power4 = new Card("Power 4", 4, 2, 1, @" ---------- 
 | POWER: 4 |
-| ATT:   1 |
+| ATT:   2 |
 | DEF:   1 |
  ---------- 
 ");
@@ -30,16 +30,16 @@ namespace CardConquestSignalR.Server.Hubs
 | DEF:   0 |
  ---------- 
 ");
-        public Card power2 = new Card("Power 2", 2, 0, 3, @" ---------- 
+        public Card power2 = new Card("Power 2", 2, 0, 2, @" ---------- 
 | POWER: 2 |
 | ATT:   0 |
-| DEF:   3 |
+| DEF:   2 |
  ---------- 
 ");
-        public Card power1 = new Card("Power 1", 1, 0, 2, @" ---------- 
+        public Card power1 = new Card("Power 1", 1, 1, 1, @" ---------- 
 | POWER: 1 |
-| ATT:   0 |
-| DEF:   2 |
+| ATT:   1 |
+| DEF:   1 |
  ---------- 
 ");
 
@@ -333,6 +333,8 @@ namespace CardConquestSignalR.Server.Hubs
             Console.WriteLine("CChecking if all players are ready");
             bool isGameOver = false;
             bool isLastRound = false;
+            string noUnitsError = null;
+
             foreach (Player player in playerGame.Room.Players)
             {
                 Console.WriteLine(player.PlayerName + " : " + player.Ready.ToString());
@@ -342,7 +344,8 @@ namespace CardConquestSignalR.Server.Hubs
                 Console.WriteLine("initiating battle cleanup");
                 //Move disabled units into available units
                 Console.WriteLine("moving disabled units to available");
-                foreach (Player player in playerGame.Room.Players)
+                playerGame = MakeUnavailableAvailable(playerGame);
+                /*foreach (Player player in playerGame.Room.Players)
                 {
                     player.AvailableInf += player.UnavailableInf;
                     player.AvailableTanks += player.UnavailableTanks;
@@ -353,7 +356,7 @@ namespace CardConquestSignalR.Server.Hubs
                     {
                         player.TotalWins++;
                     }
-                }
+                }*/
                 // Resolve the Attack / Defense effects of the cards
                 playerGame = ResolveAttackDefense(playerGame);
                 // Move remaining armies into the players "unavailable" units and discard cards
@@ -383,6 +386,67 @@ namespace CardConquestSignalR.Server.Hubs
                         }
                     }
                 }
+                // Increase winning player's win total
+                foreach (Player player in playerGame.Room.Players)
+                {
+                    if (player.PlayerName == playerGame.WinningPlayer)
+                    {
+                        player.TotalWins++;
+                    }
+                }
+                // check if any players have no units available
+                if (playerGame.Room.Players.Any(x => x.AvailableInf == 0 && x.AvailableInf == 0))
+                {
+                    // check if both players have no available units
+                    if (playerGame.Room.Players.All(x => x.AvailableInf == 0 && x.AvailableInf == 0))
+                    {
+                        playerGame.RoundNumber++;
+                        noUnitsError = "Both players had no available units. Round " + playerGame.RoundNumber.ToString() + " was forfeited by both and skipped";
+                    }
+                    else if (playerGame.Room.Players.Any(x => x.AvailableInf == 0 && x.AvailableInf == 0 && x.UnavailableInf == 0 && x.UnavailableTanks == 0))
+                    {
+                        // Check if both players are completely out of units. I don't think this is possible?
+                        if (playerGame.Room.Players.All(x => x.AvailableInf == 0 && x.AvailableInf == 0 && x.UnavailableInf == 0 && x.UnavailableTanks == 0))
+                        {
+                            noUnitsError = "Mutually assured destruction. All units in the game are destroyed. Game over.";
+                            playerGame.RoundNumber = 10;
+                        }
+                        else 
+                        {
+                            string playerWithNoAvilalbeUnits = playerGame.Room.Players.First(x => x.AvailableInf == 0 && x.AvailableInf == 0 && x.UnavailableInf == 0 && x.UnavailableTanks == 0).PlayerName;
+                            noUnitsError = playerWithNoAvilalbeUnits + " has lost all units. They foreit all remaining rounds.";
+                            int currentRoundNumber = playerGame.RoundNumber;
+                            for (int i = currentRoundNumber; i < 10; i++)
+                            {
+                                playerGame.RoundNumber++;
+                                foreach (Player player in playerGame.Room.Players)
+                                {
+                                    if (player.PlayerName != playerWithNoAvilalbeUnits)
+                                    {
+                                        player.TotalWins++;
+                                    }
+                                }
+                            }
+                            
+                        }
+                    }
+                    else
+                    {
+                        string playerWithNoAvilalbeUnits = playerGame.Room.Players.First(x => x.AvailableInf == 0 && x.AvailableInf == 0).PlayerName;
+                        playerGame.RoundNumber++;
+                        noUnitsError = playerWithNoAvilalbeUnits + " had no units. They forfeited round " + playerGame.RoundNumber.ToString();
+                        foreach (Player player in playerGame.Room.Players)
+                        {
+                            if (player.PlayerName != playerWithNoAvilalbeUnits)
+                            {
+                                player.TotalWins++;
+                            }
+                        }
+                    }
+                    
+                    playerGame = MakeUnavailableAvailable(playerGame);
+                    
+                }
                 // Reset the winning player
                 playerGame.WinningPlayer = null;
                 // Increase the round number
@@ -396,7 +460,7 @@ namespace CardConquestSignalR.Server.Hubs
                 {
                     isLastRound = true;
                 }                
-                
+                // Increase the round number
                 playerGame.RoundNumber++;
                 // reset the phase to Card Selection
                 playerGame.Phase = "Unit Selection";
@@ -407,7 +471,7 @@ namespace CardConquestSignalR.Server.Hubs
                 }
             }
             Console.WriteLine("returning player game from battle cleanup");
-            await Clients.Group(playerGame.Room.RoomName).SendAsync("Battle Completed", JsonConvert.SerializeObject(playerGame), isGameOver, isLastRound);
+            await Clients.Group(playerGame.Room.RoomName).SendAsync("Battle Completed", JsonConvert.SerializeObject(playerGame), isGameOver, isLastRound, noUnitsError);
         }
 
         public Game ResolveAttackDefense(Game playerGame)
@@ -457,5 +521,18 @@ namespace CardConquestSignalR.Server.Hubs
             }
             return playerGame;
         }
+        public Game MakeUnavailableAvailable(Game playerGame)
+        {
+            foreach (Player player in playerGame.Room.Players)
+            {
+                player.AvailableInf += player.UnavailableInf;
+                player.AvailableTanks += player.UnavailableTanks;
+                player.UnavailableInf = 0;
+                player.UnavailableTanks = 0;
+                // Increase player's win total, if they won
+            }
+            return playerGame;
+        }
+        
     }
 }

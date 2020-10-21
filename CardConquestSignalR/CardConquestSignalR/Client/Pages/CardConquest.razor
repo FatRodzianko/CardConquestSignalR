@@ -87,12 +87,12 @@
         }
     </table>
 
-    @if (isLastRound)
+    @if (!String.IsNullOrEmpty(noUnitsError))
     {
 <table style="width:100%" border="0">
     <tr>
         <td style="width:100%;text-align:center">
-            <h3>This is the last round</h3>
+            <h5>@noUnitsError</h5>
         </td>
     </tr>
 </table>
@@ -191,12 +191,19 @@
                             <tr>
                                 <td></td>
                                 <td>
-                                    Select units
-                                    <EditForm Model="@currentPlayerArmy" OnSubmit="@SubmitUnits">
-                                        <InputNumber @bind-Value="@currentPlayerArmy.Tanks">0</InputNumber>
-                                        <InputNumber @bind-Value="@currentPlayerArmy.Infantry">0</InputNumber>
-                                        <input type="submit" value="Submit" class="btn btn-primary" />
-                                    </EditForm>
+                                    @if (currentPlayerUnitPower == 0)
+                                    {
+                                <EditForm Model="@currentPlayerArmy" OnSubmit="@SubmitUnits">
+                                    <InputNumber @bind-Value="@currentPlayerArmy.Tanks">0</InputNumber>
+                                    <InputNumber @bind-Value="@currentPlayerArmy.Infantry">0</InputNumber>
+                                    <input type="submit" value="Submit" class="btn btn-primary" />
+                                </EditForm>
+                                    }
+                                    else if (currentPlayerUnitPower > 0)
+                                    {
+                                        <b>The power of your units is: </b>@currentPlayerUnitPower <b>Tanks: </b> @currentPlayerArmy.Tanks.ToString() <b>Infantry: </b>@currentPlayerArmy.Infantry.ToString()
+                                    }
+
                                     @if (!String.IsNullOrEmpty(unitError))
                                     {
                                         <b>@unitError</b>
@@ -378,176 +385,213 @@
     }
 
     @code {
-public bool isGameStarted = false;
+        public bool isGameStarted = false;
 
-    List<Card> emptyCardList = new List<Card>();
+        List<Card> emptyCardList = new List<Card>();
 
-    public Player currentPlayer = new Player("", "", false, "", 4, 6, 0, 0, null, null, 0);
-    public Player opponentPlayer = new Player("", "", false, "", 4, 6, 0, 0, null, null, 0);
-    public string username;
-    public string playerConnectionId;
-    bool gotConnectionId = false;
-    public List<Player> playerList = new List<Player>();
-    public List<Player> roomPlayers = new List<Player>();
-    public string roomName;
-    public List<Rooms> roomList = new List<Rooms>();
-    public bool gameStarted = false;
-    public bool areAllPlayersReady = false;
+        public Player currentPlayer = new Player("", "", false, "", 4, 6, 0, 0, null, null, 0);
+        public Player opponentPlayer = new Player("", "", false, "", 4, 6, 0, 0, null, null, 0);
+        public string username;
+        public string playerConnectionId;
+        bool gotConnectionId = false;
+        public List<Player> playerList = new List<Player>();
+        public List<Player> roomPlayers = new List<Player>();
+        public string roomName;
+        public List<Rooms> roomList = new List<Rooms>();
+        public bool gameStarted = false;
+        public bool areAllPlayersReady = false;
 
-    public Rooms room = new Rooms("", null);
-    public Game playerGame = new Game(1, "", null, null, "");
-    public Army currentPlayerArmy = new Army("", 0, 0, null);
-    public Army opponentArmy = new Army("", 0, 0, null);
-    public Army emptyArmy = new Army("", 0, 0, null);
-    public Card emptyCard = new Card("", 0, 0, 0, "");
+        public Rooms room = new Rooms("", null);
+        public Game playerGame = new Game(1, "", null, null, "");
+        public Army currentPlayerArmy = new Army("", 0, 0, null);
+        public Army opponentArmy = new Army("", 0, 0, null);
+        public Army emptyArmy = new Army("", 0, 0, null);
+        public Card emptyCard = new Card("", 0, 0, 0, "");
 
-    public string gamePhase;
-    public string unitError;
-    public string cardError;
-    public int opponentAvailableTanks;
-    public int opponentAvailableInf;
-    public int currentPlayerUnitPower;
-    public int opponentUnitPower;
-    public bool isGameOver = false;
-    public bool isLastRound = false;
+        public string gamePhase;
+        public string unitError;
+        public string cardError;
+        public int opponentAvailableTanks;
+        public int opponentAvailableInf;
+        public int currentPlayerUnitPower;
+        public int opponentUnitPower;
+        public bool isGameOver = false;
+        public bool isLastRound = false;
+        public string noUnitsError = null;
 
-    private HubConnection hubConnection;
+        private HubConnection hubConnection;
 
-    protected override async Task OnInitializedAsync()
-    {
-        hubConnection = new HubConnectionBuilder()
-            .WithUrl(navigationManager.ToAbsoluteUri("/CardConquestHub"))
-            .Build();
-        //Return a list of users
-        hubConnection.On<string>("Returned users", (usersToJson) =>
+        protected override async Task OnInitializedAsync()
         {
-            playerList = JsonConvert.DeserializeAnonymousType(usersToJson, playerList);
-            StateHasChanged();
-        });
-        //Return list of rooms
-        hubConnection.On<string>("Returned rooms", (roomListToJson) =>
-        {
-            roomList = JsonConvert.DeserializeAnonymousType(roomListToJson, roomList);
-            StateHasChanged();
-        });
-
-        // After a user updated their username
-        hubConnection.On<string, string, string>("Player Name Added", (playerListToJson, currentPlayerToJson, roomListToJson) =>
-        {
-            playerList = JsonConvert.DeserializeAnonymousType(playerListToJson, playerList);
-            currentPlayer = JsonConvert.DeserializeAnonymousType(currentPlayerToJson, currentPlayer);
-            gotConnectionId = true;
-            playerConnectionId = currentPlayer.ConnectionId;
-            roomList = JsonConvert.DeserializeAnonymousType(roomListToJson, roomList);
-            StateHasChanged();
-        });
-        // Player joins or creates a room
-        hubConnection.On<string, string, string>("Room Joined", (playerListToJson, currentPlayerToJson, roomListToJson) =>
-        {
-            playerList = JsonConvert.DeserializeAnonymousType(playerListToJson, playerList);
-            currentPlayer = JsonConvert.DeserializeAnonymousType(currentPlayerToJson, currentPlayer);
-            roomList = JsonConvert.DeserializeAnonymousType(roomListToJson, roomList);
-            StateHasChanged();
-        });
-
-        hubConnection.On<string, bool, string, string>("User Readied", (playerListToJson, arePlayersReady, roomPlayersToJson, playerGameToJson) =>
-        {
-            playerList = JsonConvert.DeserializeAnonymousType(playerListToJson, playerList);
-        //currentPlayer = playerList.First(x => x.PlayerName == currentPlayer.PlayerName);
-        roomPlayers = JsonConvert.DeserializeAnonymousType(roomPlayersToJson, roomPlayers);
-            areAllPlayersReady = arePlayersReady;
-            if (areAllPlayersReady)
+            hubConnection = new HubConnectionBuilder()
+                .WithUrl(navigationManager.ToAbsoluteUri("/CardConquestHub"))
+                .Build();
+            //Return a list of users
+            hubConnection.On<string>("Returned users", (usersToJson) =>
             {
-            //opponentPlayer = roomPlayers.First(x => x.PlayerName != currentPlayer.PlayerName);
-            playerGame = JsonConvert.DeserializeAnonymousType(playerGameToJson, playerGame);
+                playerList = JsonConvert.DeserializeAnonymousType(usersToJson, playerList);
+                StateHasChanged();
+            });
+            //Return list of rooms
+            hubConnection.On<string>("Returned rooms", (roomListToJson) =>
+            {
+                roomList = JsonConvert.DeserializeAnonymousType(roomListToJson, roomList);
+                StateHasChanged();
+            });
+
+            // After a user updated their username
+            hubConnection.On<string, string, string>("Player Name Added", (playerListToJson, currentPlayerToJson, roomListToJson) =>
+            {
+                playerList = JsonConvert.DeserializeAnonymousType(playerListToJson, playerList);
+                currentPlayer = JsonConvert.DeserializeAnonymousType(currentPlayerToJson, currentPlayer);
+                gotConnectionId = true;
+                playerConnectionId = currentPlayer.ConnectionId;
+                roomList = JsonConvert.DeserializeAnonymousType(roomListToJson, roomList);
+                StateHasChanged();
+            });
+            // Player joins or creates a room
+            hubConnection.On<string, string, string>("Room Joined", (playerListToJson, currentPlayerToJson, roomListToJson) =>
+            {
+                playerList = JsonConvert.DeserializeAnonymousType(playerListToJson, playerList);
+                currentPlayer = JsonConvert.DeserializeAnonymousType(currentPlayerToJson, currentPlayer);
+                roomList = JsonConvert.DeserializeAnonymousType(roomListToJson, roomList);
+                StateHasChanged();
+            });
+
+            hubConnection.On<string, bool, string, string>("User Readied", (playerListToJson, arePlayersReady, roomPlayersToJson, playerGameToJson) =>
+            {
+                playerList = JsonConvert.DeserializeAnonymousType(playerListToJson, playerList);
+                //currentPlayer = playerList.First(x => x.PlayerName == currentPlayer.PlayerName);
+                roomPlayers = JsonConvert.DeserializeAnonymousType(roomPlayersToJson, roomPlayers);
+                areAllPlayersReady = arePlayersReady;
+                if (areAllPlayersReady)
+                {
+                    //opponentPlayer = roomPlayers.First(x => x.PlayerName != currentPlayer.PlayerName);
+                    playerGame = JsonConvert.DeserializeAnonymousType(playerGameToJson, playerGame);
+                    gamePhase = playerGame.Phase;
+                    currentPlayer = playerGame.Room.Players.First(x => x.PlayerName == currentPlayer.PlayerName);
+                    currentPlayerArmy = playerGame.Armies.First(x => x.PlayerName == currentPlayer.PlayerName);
+                    opponentPlayer = playerGame.Room.Players.First(x => x.PlayerName != currentPlayer.PlayerName);
+                    opponentArmy = playerGame.Armies.First(x => x.PlayerName == opponentPlayer.PlayerName);
+                    opponentAvailableTanks = opponentPlayer.AvailableTanks;
+                    opponentAvailableInf = opponentPlayer.AvailableInf;
+                }
+                StateHasChanged();
+            });
+            //Receiving submitted units
+            hubConnection.On<string>("Units Submitted To Group", (playerGameToJson) =>
+            {
+                playerGame = JsonConvert.DeserializeAnonymousType(playerGameToJson, playerGame);
                 gamePhase = playerGame.Phase;
                 currentPlayer = playerGame.Room.Players.First(x => x.PlayerName == currentPlayer.PlayerName);
                 currentPlayerArmy = playerGame.Armies.First(x => x.PlayerName == currentPlayer.PlayerName);
                 opponentPlayer = playerGame.Room.Players.First(x => x.PlayerName != currentPlayer.PlayerName);
                 opponentArmy = playerGame.Armies.First(x => x.PlayerName == opponentPlayer.PlayerName);
+                currentPlayerUnitPower = (currentPlayerArmy.Tanks * 2) + currentPlayerArmy.Infantry;
+                opponentUnitPower = (opponentArmy.Tanks * 2) + opponentArmy.Infantry;
+                StateHasChanged();
+            });
+            hubConnection.On<string>("Card Submitted To Group", (playerGameToJson) =>
+            {
+                playerGame = JsonConvert.DeserializeAnonymousType(playerGameToJson, playerGame);
+                gamePhase = playerGame.Phase;
+                currentPlayer = playerGame.Room.Players.First(x => x.PlayerName == currentPlayer.PlayerName);
+                currentPlayerArmy = playerGame.Armies.First(x => x.PlayerName == currentPlayer.PlayerName);
+                opponentPlayer = playerGame.Room.Players.First(x => x.PlayerName != currentPlayer.PlayerName);
+                opponentArmy = playerGame.Armies.First(x => x.PlayerName == opponentPlayer.PlayerName);
+                currentPlayerUnitPower = (currentPlayerArmy.Tanks * 2) + currentPlayerArmy.Infantry + currentPlayerArmy.PlayerCard.Power;
+                opponentUnitPower = (opponentArmy.Tanks * 2) + opponentArmy.Infantry + opponentArmy.PlayerCard.Power;
+                StateHasChanged();
+            });
+            hubConnection.On<string, bool, bool, string>("Battle Completed", (playerGameToJson, isGameOverFromGroup, isLastRoundFromGroup, noUnitsErrorFromGroup) =>
+            {
+                playerGame = JsonConvert.DeserializeAnonymousType(playerGameToJson, playerGame);
+                gamePhase = playerGame.Phase;
+                currentPlayer = playerGame.Room.Players.First(x => x.PlayerName == currentPlayer.PlayerName);
+                currentPlayerArmy = playerGame.Armies.First(x => x.PlayerName == currentPlayer.PlayerName);
+                opponentPlayer = playerGame.Room.Players.First(x => x.PlayerName != currentPlayer.PlayerName);
+                opponentArmy = playerGame.Armies.First(x => x.PlayerName == opponentPlayer.PlayerName);
+                currentPlayerUnitPower = (currentPlayerArmy.Tanks * 2) + currentPlayerArmy.Infantry;
+                opponentUnitPower = (opponentArmy.Tanks * 2) + opponentArmy.Infantry;
                 opponentAvailableTanks = opponentPlayer.AvailableTanks;
                 opponentAvailableInf = opponentPlayer.AvailableInf;
-            }
-            StateHasChanged();
-        });
-        //Receiving submitted units
-        hubConnection.On<string>("Units Submitted To Group", (playerGameToJson) =>
+                if (playerGame.Room.Players.All(x => x.Ready == false))
+                {
+                    isGameOver = isGameOverFromGroup;
+                    isLastRound = isLastRoundFromGroup;
+                }
+
+                if (isGameOver)
+                {
+                    if (currentPlayer.TotalWins > opponentPlayer.TotalWins)
+                    {
+                        playerGame.WinningPlayer = currentPlayer.PlayerName;
+                    }
+                    else if (currentPlayer.TotalWins < opponentPlayer.TotalWins)
+                    {
+                        playerGame.WinningPlayer = opponentPlayer.PlayerName;
+                    }
+                    else if (currentPlayer.TotalWins == opponentPlayer.TotalWins)
+                    {
+                        playerGame.WinningPlayer = "tie";
+                    }
+                }
+                noUnitsError = noUnitsErrorFromGroup;
+                StateHasChanged();
+            });
+
+            await hubConnection.StartAsync();
+        }
+
+        public void SubmitUnits()
         {
-            playerGame = JsonConvert.DeserializeAnonymousType(playerGameToJson, playerGame);
-            gamePhase = playerGame.Phase;
-            currentPlayer = playerGame.Room.Players.First(x => x.PlayerName == currentPlayer.PlayerName);
-            currentPlayerArmy = playerGame.Armies.First(x => x.PlayerName == currentPlayer.PlayerName);
-            opponentPlayer = playerGame.Room.Players.First(x => x.PlayerName != currentPlayer.PlayerName);
-            opponentArmy = playerGame.Armies.First(x => x.PlayerName == opponentPlayer.PlayerName);
-            currentPlayerUnitPower = (currentPlayerArmy.Tanks * 2) + currentPlayerArmy.Infantry;
-            opponentUnitPower = (opponentArmy.Tanks * 2) + opponentArmy.Infantry;
-            StateHasChanged();
-        });
-        hubConnection.On<string>("Card Submitted To Group", (playerGameToJson) =>
-        {
-            playerGame = JsonConvert.DeserializeAnonymousType(playerGameToJson, playerGame);
-            gamePhase = playerGame.Phase;
-            currentPlayer = playerGame.Room.Players.First(x => x.PlayerName == currentPlayer.PlayerName);
-            currentPlayerArmy = playerGame.Armies.First(x => x.PlayerName == currentPlayer.PlayerName);
-            opponentPlayer = playerGame.Room.Players.First(x => x.PlayerName != currentPlayer.PlayerName);
-            opponentArmy = playerGame.Armies.First(x => x.PlayerName == opponentPlayer.PlayerName);
-            currentPlayerUnitPower = (currentPlayerArmy.Tanks * 2) + currentPlayerArmy.Infantry + currentPlayerArmy.PlayerCard.Power;
-            opponentUnitPower = (opponentArmy.Tanks * 2) + opponentArmy.Infantry + opponentArmy.PlayerCard.Power;
-            StateHasChanged();
-        });
-        hubConnection.On<string, bool, bool>("Battle Completed", (playerGameToJson, isGameOverFromGroup, isLastRoundFromGroup) =>
-        {
-            playerGame = JsonConvert.DeserializeAnonymousType(playerGameToJson, playerGame);
-            gamePhase = playerGame.Phase;
-            currentPlayer = playerGame.Room.Players.First(x => x.PlayerName == currentPlayer.PlayerName);
-            currentPlayerArmy = playerGame.Armies.First(x => x.PlayerName == currentPlayer.PlayerName);
-            opponentPlayer = playerGame.Room.Players.First(x => x.PlayerName != currentPlayer.PlayerName);
-            opponentArmy = playerGame.Armies.First(x => x.PlayerName == opponentPlayer.PlayerName);
-            currentPlayerUnitPower = (currentPlayerArmy.Tanks * 2) + currentPlayerArmy.Infantry;
-            opponentUnitPower = (opponentArmy.Tanks * 2) + opponentArmy.Infantry;
-            opponentAvailableTanks = opponentPlayer.AvailableTanks;
-            opponentAvailableInf = opponentPlayer.AvailableInf;
-            if (playerGame.Room.Players.All(x => x.Ready == false))
+            int totalUnits = currentPlayerArmy.Tanks + currentPlayerArmy.Infantry;
+            if (totalUnits > 0)
             {
-                isGameOver = isGameOverFromGroup;
-                isLastRound = isLastRoundFromGroup;
+                if ((currentPlayerArmy.Tanks <= currentPlayer.AvailableTanks) && (currentPlayerArmy.Infantry <= currentPlayer.AvailableInf))
+                {
+                    foreach (Army army in playerGame.Armies)
+                    {
+                        if (army.PlayerName == currentPlayer.PlayerName)
+                        {
+                            army.Tanks = currentPlayerArmy.Tanks;
+                            army.Infantry = currentPlayerArmy.Infantry;
+                            currentPlayerUnitPower = (currentPlayerArmy.Tanks * 2) + currentPlayerArmy.Infantry;
+                        }
+                    }
+                    foreach (Player player in playerGame.Room.Players)
+                    {
+                        if (player.PlayerName == currentPlayer.PlayerName)
+                        {
+                            player.Ready = true;
+                        }
+                    }
+                    unitError = null;
+                    SubmitUnitsToGroup();
+                }
+                else
+                {
+                    unitError = "Not enough available units";
+                }
             }
-
-            if (isGameOver)
+            else
             {
-                if (currentPlayer.TotalWins > opponentPlayer.TotalWins)
-                {
-                    playerGame.WinningPlayer = currentPlayer.PlayerName;
-                }
-                else if (currentPlayer.TotalWins < opponentPlayer.TotalWins)
-                {
-                    playerGame.WinningPlayer = opponentPlayer.PlayerName;
-                }
-                else if (currentPlayer.TotalWins == opponentPlayer.TotalWins)
-                {
-                    playerGame.WinningPlayer = "tie";
-                }
+                unitError = "You must select at least one unit";
             }
-            StateHasChanged();
-        });
+        }
 
-        await hubConnection.StartAsync();
-    }
-
-    public void SubmitUnits()
-    {
-        int totalUnits = currentPlayerArmy.Tanks + currentPlayerArmy.Infantry;
-        if (totalUnits > 0)
+        public void SubmitCard()
         {
-            if ((currentPlayerArmy.Tanks <= currentPlayer.AvailableTanks) && (currentPlayerArmy.Infantry <= currentPlayer.AvailableInf))
+            if (!String.IsNullOrEmpty(emptyCard.CardName))
             {
                 foreach (Army army in playerGame.Armies)
                 {
-                    if (army.PlayerName == currentPlayer.PlayerName)
+                    if (army.PlayerName == currentPlayerArmy.PlayerName)
                     {
-                        army.Tanks = currentPlayerArmy.Tanks;
-                        army.Infantry = currentPlayerArmy.Infantry;
+                        Card selectedCard = currentPlayer.Hand.First(x => x.CardName == emptyCard.CardName);
+                        army.PlayerCard = selectedCard;
                     }
+
                 }
                 foreach (Player player in playerGame.Room.Players)
                 {
@@ -556,33 +600,17 @@ public bool isGameStarted = false;
                         player.Ready = true;
                     }
                 }
-                unitError = null;
-                SubmitUnitsToGroup();
+                cardError = null;
+                SubmitCardToGroup();
             }
             else
             {
-                unitError = "Not enough available units";
+                cardError = "you must select a card";
             }
         }
-        else
-        {
-            unitError = "You must select at least one unit";
-        }
-    }
 
-    public void SubmitCard()
-    {
-        if (!String.IsNullOrEmpty(emptyCard.CardName))
+        public void BattleCleanUp()
         {
-            foreach (Army army in playerGame.Armies)
-            {
-                if (army.PlayerName == currentPlayerArmy.PlayerName)
-                {
-                    Card selectedCard = currentPlayer.Hand.First(x => x.CardName == emptyCard.CardName);
-                    army.PlayerCard = selectedCard;
-                }
-
-            }
             foreach (Player player in playerGame.Room.Players)
             {
                 if (player.PlayerName == currentPlayer.PlayerName)
@@ -590,51 +618,33 @@ public bool isGameStarted = false;
                     player.Ready = true;
                 }
             }
-            cardError = null;
-            SubmitCardToGroup();
+            BattleCleanUpToGroup();
         }
-        else
+
+        Task CreatePlayerName() =>
+            hubConnection.SendAsync("CreatePlayerName", username);
+        Task GetUsers() =>
+            hubConnection.SendAsync("GetUsers");
+        Task ReadyUp() =>
+            hubConnection.SendAsync("ReadyUp");
+        Task CreateOrJoinRoom() =>
+            hubConnection.SendAsync("CreateOrJoinRoom", roomName);
+        Task GetRooms() =>
+            hubConnection.SendAsync("GetRooms");
+        Task SubmitUnitsToGroup() =>
+            hubConnection.SendAsync("SubmitUnitsToGroup", JsonConvert.SerializeObject(playerGame));
+        Task SubmitCardToGroup() =>
+            hubConnection.SendAsync("SubmitCardToGroup", JsonConvert.SerializeObject(playerGame));
+        Task BattleCleanUpToGroup() =>
+            hubConnection.SendAsync("BattleCleanUpToGroup", JsonConvert.SerializeObject(playerGame));
+
+
+        public bool IsConnected =>
+    hubConnection.State == HubConnectionState.Connected;
+
+        public void Dispose()
         {
-            cardError = "you must select a card";
+            _ = hubConnection.DisposeAsync();
         }
-    }
-
-    public void BattleCleanUp()
-    {
-        foreach (Player player in playerGame.Room.Players)
-        {
-            if (player.PlayerName == currentPlayer.PlayerName)
-            {
-                player.Ready = true;
-            }
-        }
-        BattleCleanUpToGroup();
-    }
-
-    Task CreatePlayerName() =>
-        hubConnection.SendAsync("CreatePlayerName", username);
-    Task GetUsers() =>
-        hubConnection.SendAsync("GetUsers");
-    Task ReadyUp() =>
-        hubConnection.SendAsync("ReadyUp");
-    Task CreateOrJoinRoom() =>
-        hubConnection.SendAsync("CreateOrJoinRoom", roomName);
-    Task GetRooms() =>
-        hubConnection.SendAsync("GetRooms");
-    Task SubmitUnitsToGroup() =>
-        hubConnection.SendAsync("SubmitUnitsToGroup", JsonConvert.SerializeObject(playerGame));
-    Task SubmitCardToGroup() =>
-        hubConnection.SendAsync("SubmitCardToGroup", JsonConvert.SerializeObject(playerGame));
-    Task BattleCleanUpToGroup() =>
-        hubConnection.SendAsync("BattleCleanUpToGroup", JsonConvert.SerializeObject(playerGame));
-
-
-    public bool IsConnected =>
-hubConnection.State == HubConnectionState.Connected;
-
-    public void Dispose()
-    {
-        _ = hubConnection.DisposeAsync();
-    }
 
     }
