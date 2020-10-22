@@ -395,25 +395,25 @@ namespace CardConquestSignalR.Server.Hubs
                     }
                 }
                 // check if any players have no units available
-                if (playerGame.Room.Players.Any(x => x.AvailableInf == 0 && x.AvailableInf == 0))
+                if (playerGame.Room.Players.Any(x => x.AvailableInf == 0 && x.AvailableTanks == 0))
                 {
                     // check if both players have no available units
-                    if (playerGame.Room.Players.All(x => x.AvailableInf == 0 && x.AvailableInf == 0))
+                    if (playerGame.Room.Players.All(x => x.AvailableInf == 0 && x.AvailableTanks == 0))
                     {
                         playerGame.RoundNumber++;
                         noUnitsError = "Both players had no available units. Round " + playerGame.RoundNumber.ToString() + " was forfeited by both and skipped";
                     }
-                    else if (playerGame.Room.Players.Any(x => x.AvailableInf == 0 && x.AvailableInf == 0 && x.UnavailableInf == 0 && x.UnavailableTanks == 0))
+                    else if (playerGame.Room.Players.Any(x => x.AvailableInf == 0 && x.AvailableTanks == 0 && x.UnavailableInf == 0 && x.UnavailableTanks == 0))
                     {
                         // Check if both players are completely out of units. I don't think this is possible?
-                        if (playerGame.Room.Players.All(x => x.AvailableInf == 0 && x.AvailableInf == 0 && x.UnavailableInf == 0 && x.UnavailableTanks == 0))
+                        if (playerGame.Room.Players.All(x => x.AvailableInf == 0 && x.AvailableTanks == 0 && x.UnavailableInf == 0 && x.UnavailableTanks == 0))
                         {
                             noUnitsError = "Mutually assured destruction. All units in the game are destroyed. Game over.";
                             playerGame.RoundNumber = 10;
                         }
                         else 
                         {
-                            string playerWithNoAvilalbeUnits = playerGame.Room.Players.First(x => x.AvailableInf == 0 && x.AvailableInf == 0 && x.UnavailableInf == 0 && x.UnavailableTanks == 0).PlayerName;
+                            string playerWithNoAvilalbeUnits = playerGame.Room.Players.First(x => x.AvailableInf == 0 && x.AvailableTanks == 0 && x.UnavailableInf == 0 && x.UnavailableTanks == 0).PlayerName;
                             noUnitsError = playerWithNoAvilalbeUnits + " has lost all units. They foreit all remaining rounds.";
                             int currentRoundNumber = playerGame.RoundNumber;
                             for (int i = currentRoundNumber; i < 10; i++)
@@ -432,7 +432,7 @@ namespace CardConquestSignalR.Server.Hubs
                     }
                     else
                     {
-                        string playerWithNoAvilalbeUnits = playerGame.Room.Players.First(x => x.AvailableInf == 0 && x.AvailableInf == 0).PlayerName;
+                        string playerWithNoAvilalbeUnits = playerGame.Room.Players.First(x => x.AvailableInf == 0 && x.AvailableTanks == 0).PlayerName;
                         playerGame.RoundNumber++;
                         noUnitsError = playerWithNoAvilalbeUnits + " had no units. They forfeited round " + playerGame.RoundNumber.ToString();
                         foreach (Player player in playerGame.Room.Players)
