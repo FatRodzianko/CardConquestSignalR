@@ -545,6 +545,8 @@
 
         public void SubmitUnits()
         {
+            currentPlayerArmy.Infantry = Math.Abs(currentPlayerArmy.Infantry);
+            currentPlayerArmy.Tanks = Math.Abs(currentPlayerArmy.Tanks);
             int totalUnits = currentPlayerArmy.Tanks + currentPlayerArmy.Infantry;
             if (totalUnits > 0)
             {
