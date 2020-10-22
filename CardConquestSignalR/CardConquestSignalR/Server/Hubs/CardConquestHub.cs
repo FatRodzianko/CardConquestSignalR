@@ -56,19 +56,35 @@ namespace CardConquestSignalR.Server.Hubs
         {
             // Remove the player from any game rooms
             Player RequestingPlayer = playerList.First(x => x.ConnectionId == Context.ConnectionId);
-            Rooms roomJoined = roomList.First(x => x.RoomName == RequestingPlayer.RoomName);
-            var playerToRemove = roomJoined.Players.Where(x => x.PlayerName == RequestingPlayer.PlayerName).First();
-            roomJoined.Players.Remove(playerToRemove);
-            bool isRoomEmpty = IsRoomEmpty(RequestingPlayer.RoomName);
-            if (isRoomEmpty)
+            //Rooms roomJoined = roomList.First(x => x.RoomName == RequestingPlayer.RoomName);
+            Rooms roomJoined = new Rooms(null, null);
+            try
             {
-                roomList.RemoveAll(x => x.RoomName == RequestingPlayer.RoomName);
+                roomJoined = roomList.First(x => x.RoomName == RequestingPlayer.RoomName);
             }
-            if (!String.IsNullOrEmpty(RequestingPlayer.RoomName))
+            catch (Exception e) { }
+            if (!String.IsNullOrEmpty(roomJoined.RoomName))
             {
-                LeaveRoom(RequestingPlayer.RoomName);
+                Player playerToRemove = new Player(null, null, false, null, 0, 0, 0, 0, null, null, 0);
+                try
+                {
+                    playerToRemove = roomJoined.Players.Where(x => x.PlayerName == RequestingPlayer.PlayerName).First();
+                }
+                catch (Exception e) { }
+                //var playerToRemove = roomJoined.Players.Where(x => x.PlayerName == RequestingPlayer.PlayerName).First();
+                roomJoined.Players.Remove(playerToRemove);
+                bool isRoomEmpty = IsRoomEmpty(RequestingPlayer.RoomName);
+                if (isRoomEmpty)
+                {
+                    roomList.RemoveAll(x => x.RoomName == RequestingPlayer.RoomName);
+                }
+                if (!String.IsNullOrEmpty(RequestingPlayer.RoomName))
+                {
+                    LeaveRoom(RequestingPlayer.RoomName);
+                }
+                // remove the player from the player list
             }
-            // remove the player from the player list
+
             playerList.RemoveAll(x => x.ConnectionId == Context.ConnectionId);
             return base.OnDisconnectedAsync(exception);
         }
