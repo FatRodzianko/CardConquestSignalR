@@ -54,7 +54,7 @@ namespace CardConquestSignalR.Server.Hubs
         }
         public override Task OnDisconnectedAsync(Exception exception)
         {
-            // git change...
+            // git change... 
             // Remove the player from any game rooms
             Player RequestingPlayer = playerList.First(x => x.ConnectionId == Context.ConnectionId);
             //Rooms roomJoined = roomList.First(x => x.RoomName == RequestingPlayer.RoomName);
